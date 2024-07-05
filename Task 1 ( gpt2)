@@ -1,0 +1,64 @@
+# PRODIGY_GA
+import torch
+from transformers import GPT2LMHeadModel, GPT2Tokenizer, Trainer, TrainingArguments
+from datasets import load_dataset
+
+# Load the dataset (adjust accordingly based on your dataset)
+dataset = load_dataset('text', data_files={'train': 'path_to_train_dataset.txt', 'validation': 'path_to_validation_dataset.txt'})
+
+# Load pre-trained GPT-2 model and tokenizer
+model_name = 'gpt2-medium'
+tokenizer = GPT2Tokenizer.from_pretrained(model_name)
+model = GPT2LMHeadModel.from_pretrained(model_name)
+
+# Tokenize the dataset
+def tokenize_function(examples):
+    return tokenizer(examples['text'])
+
+tokenized_datasets = dataset.map(tokenize_function, batched=True)
+
+# Define training arguments
+training_args = TrainingArguments(
+    per_device_train_batch_size=4,
+    num_train_epochs=3,
+    logging_dir='./logs',
+    logging_steps=100,
+    save_steps=1000,
+    evaluation_strategy="steps",
+    eval_steps=500,
+    save_total_limit=2,
+    load_best_model_at_end=True,
+    metric_for_best_model="eval_loss",
+    greater_is_better=False,
+)
+
+# Function to compute metrics for evaluation
+def compute_metrics(eval_pred):
+    predictions, labels = eval_pred
+    loss = torch.nn.functional.cross_entropy(predictions.logits.view(-1, tokenizer.vocab_size), labels.view(-1))
+    perplexity = torch.exp(loss)
+    return {"perplexity": perplexity}
+
+# Initialize Trainer
+trainer = Trainer(
+    model=model,
+    args=training_args,
+    train_dataset=tokenized_datasets['train'],
+    eval_dataset=tokenized_datasets['validation'],
+    tokenizer=tokenizer,
+    compute_metrics=compute_metrics
+)
+
+# Train the model
+trainer.train()
+
+# Save the fine-tuned model
+trainer.save_model("fine_tuned_gpt2")
+
+# Example of text generation after training
+prompt_text = "Once upon a time"
+input_ids = tokenizer.encode(prompt_text, return_tensors='pt')
+output = model.generate(input_ids, max_length=100, num_return_sequences=3, temperature=0.7)
+
+for i, sample_output in enumerate(output):
+    print(f"Generated text {i+1}: {tokenizer.decode(sample_output, skip_special_tokens=True)}")
