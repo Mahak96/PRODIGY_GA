@@ -1,0 +1,61 @@
+import random
+import string
+
+def preprocess_text(text):
+    # Keep spaces to separate words, remove other punctuation
+    translator = str.maketrans('', '', string.punctuation.replace(' ', ''))
+    text = text.translate(translator)
+    return text.lower()
+
+def build_transition_matrix(text, order=2):
+    transition_matrix = {}
+
+    for i in range(len(text) - order):
+        sequence = text[i:i + order]
+        next_char = text[i + order]
+        
+        if sequence in transition_matrix:
+            if next_char in transition_matrix[sequence]:
+                transition_matrix[sequence][next_char] += 1
+            else:
+                transition_matrix[sequence][next_char] = 1
+        else:
+            transition_matrix[sequence] = {next_char: 1}
+
+    # Convert frequencies to probabilities
+    for sequence, next_chars in transition_matrix.items():
+        total_count = sum(next_chars.values())
+        for char in next_chars:
+            transition_matrix[sequence][char] /= total_count
+
+    return transition_matrix
+
+def generate_markov_text(transition_matrix, order=2, length=100):
+    current_sequence = random.choice(list(transition_matrix.keys()))
+    generated_text = current_sequence
+
+    for _ in range(length):
+        if current_sequence in transition_matrix:
+            next_char = random.choices(list(transition_matrix[current_sequence].keys()), 
+                                       weights=list(transition_matrix[current_sequence].values()))[0]
+            generated_text += next_char
+            current_sequence = generated_text[-order:]
+        else:
+            break
+
+    return generated_text
+
+# Example usage:
+input_text = """
+Markov chains, named after Andrey Markov, are mathematical systems that undergo transitions from one state to another, between a finite or countable number of possible states. The concept has been applied in various fields, including mathematics, physics, chemistry, economics, finance, biology, linguistics, computer science, and more. Markov chains have numerous applications as stochastic models in real-life situations, particularly in systems where randomness plays a significant role.
+"""
+
+# Preprocess the text
+preprocessed_text = preprocess_text(input_text)
+
+# Build the transition matrix
+transition_matrix = build_transition_matrix(preprocessed_text, order=3)  # Adjust order as needed
+
+# Generate text
+generated_text = generate_markov_text(transition_matrix, order=3, length=200)
+print(generated_text)
